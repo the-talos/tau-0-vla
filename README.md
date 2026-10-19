@@ -64,6 +64,23 @@ cd tau-0-vla
 bash scripts/setup.sh
 ```
 
+### How to run the same on Intel's XPU
+
+Only the PyTorch install changes; everything above stays the same. Every entry
+point auto-detects the device (XPU, then CUDA, then CPU), and `--device` pins one.
+
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/xpu
+pip install -e .  # skip scripts/setup.sh, which installs the CUDA stack
+
+python -m deploy.server --model outputs/<run_name> --device xpu:0
+python deploy/openloop.py --ckpt outputs/<run_name> --device xpu:0 --no-plot
+```
+
+`flash-attn` is not needed: the VLA joint-attention path uses SDPA/eager.
+`--infer-mode optim` needs CUDA graph capture, so it remains CUDA-only and falls
+back to the eager path on XPU with a one-line warning.
+
 ## High-level components
 
 [Proposal](high_level/proposal/README.md) predicts the next subtask and updates
