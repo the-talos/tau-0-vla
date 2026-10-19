@@ -57,15 +57,26 @@ def create_app(policy):
     return app
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
+    """CLI surface, split out so tests can pin flags without running the model."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument("--adapter")
-    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="xpu | cuda | cpu, with an optional index (xpu:1). Auto-detects XPU > CUDA > CPU when omitted.",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=10089)
+    return parser
+
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
     import uvicorn
+
     from .runtime import Proposal
     uvicorn.run(create_app(Proposal(args.model, args.adapter, args.device)), host=args.host, port=args.port)
 

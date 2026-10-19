@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from tau0_vla.utils.device import get_device_rng_state, set_device_rng_state
 from tau0_vla.utils.profiling import cuda_sync
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,7 @@ def _run_dummy_input_warmup(policy, *, warmup_steps: int = 3, seed: int = 42) ->
         return
 
     cpu_rng_state = torch.get_rng_state()
-    cuda_rng_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
+    device_rng_state = get_device_rng_state()
 
     try:
         payload = _dummy_payload(policy, seed=seed)
@@ -119,6 +120,5 @@ def _run_dummy_input_warmup(policy, *, warmup_steps: int = 3, seed: int = 42) ->
         logger.exception("[warmup] failed; continuing without warmed inference path")
     finally:
         torch.set_rng_state(cpu_rng_state)
-        if cuda_rng_states is not None:
-            torch.cuda.set_rng_state_all(cuda_rng_states)
+        set_device_rng_state(device_rng_state)
         cuda_sync()

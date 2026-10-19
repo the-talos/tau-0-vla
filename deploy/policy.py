@@ -25,6 +25,7 @@ import torch
 from PIL import Image as PILImage
 
 from tau0_vla.data import encode_payload, load_checkpoint_spec, load_data_spec, restore_action
+from tau0_vla.utils.device import resolve_device
 from tau0_vla.utils.run_spec import load_resolved_args
 
 
@@ -78,10 +79,7 @@ class Tau0VLAPolicy:
         mb = ModelBuilder(training_args, model_args, rebuilt_data_args, is_training=False)
         mb.build()
 
-        torch_device = (
-            torch.device(device) if device is not None
-            else torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        torch_device = resolve_device(device)
         mb.model.to(torch_device).eval()
         return cls(model=mb.model, processor=mb.processor, data_spec=data_spec, device=torch_device)
 

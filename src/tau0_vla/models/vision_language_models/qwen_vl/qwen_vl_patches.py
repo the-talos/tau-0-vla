@@ -26,6 +26,7 @@ from transformers.processing_utils import Unpack
 from transformers.utils import logging
 from transformers.utils.deprecation import deprecate_kwarg
 
+from tau0_vla.utils.device import resolve_compute_dtype
 from tau0_vla.utils.utils import rank0_print
 
 logger = logging.get_logger(__name__)
@@ -60,17 +61,7 @@ def flash_attention_forward_multi_batch(
 
     # === Step 0: handle dtype (LayerNorm runs in fp32) ===
     if query.dtype == torch.float32:
-        if torch.is_autocast_enabled():
-            target_dtype = torch.get_autocast_gpu_dtype()
-        elif hasattr(module.config, "_pre_quantization_dtype"):
-            target_dtype = module.config._pre_quantization_dtype
-        else:
-            for layer in module.modules():
-                if isinstance(layer, torch.nn.Linear):
-                    target_dtype = layer.weight.dtype
-                    break
-            else:
-                target_dtype = query.dtype
+        target_dtype = resolve_compute_dtype(module, query)
         query = query.to(target_dtype)
         key = key.to(target_dtype)
         value = value.to(target_dtype)

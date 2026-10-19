@@ -1340,7 +1340,17 @@ class FlowMatching(nn.Module):
                 "increase --max-prefix-len or use --infer-mode eager."
             )
         static_requested = max_prefix_len > 0 and L <= max_prefix_len
+        # CUDA graph capture is CUDA-only (torch.cuda.CUDAGraph); on XPU and CPU the
+        # dynamic eager path below is used, so say so once instead of silently skipping
+        # the optimisation the caller asked for.
         use_static_cache = static_requested and device.type == "cuda" and torch.cuda.is_available()
+        if static_requested and not use_static_cache:
+            logger.warning_once(
+                "max_prefix_len=%s requests the static prefix/CUDA-graph path, which is CUDA-only; "
+                "falling back to the dynamic eager path on device type '%s'.",
+                max_prefix_len,
+                device.type,
+            )
         if use_static_cache and L < max_prefix_len:
             pad_len = max_prefix_len - L
             prefix_embs = F.pad(prefix_embs, (0, 0, 0, pad_len))  # [B, max_prefix_len, D]

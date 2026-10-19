@@ -26,6 +26,7 @@ from torch.utils.data import DataLoader, DistributedSampler, RandomSampler
 from transformers import Trainer, TrainerCallback
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, get_last_checkpoint
 
+from tau0_vla.utils.device import empty_cache, is_available, synchronize
 from tau0_vla.utils.utils import rank0_print
 
 logger = logging.getLogger(__name__)
@@ -437,12 +438,8 @@ class Tau0VLATrainer(Trainer):
             self._record_profile_average(f"{_ROUTE_NAME}_{key.removeprefix('profile_')}", float(value))
 
     def _maybe_profile_cuda_sync(self) -> None:
-        if (
-            self._is_step_profiling_enabled()
-            and getattr(self, "_step_profiling_cuda_sync", False)
-            and torch.cuda.is_available()
-        ):
-            torch.cuda.synchronize()
+        if self._is_step_profiling_enabled() and getattr(self, "_step_profiling_cuda_sync", False):
+            synchronize()
 
     def _wrap_optimizer_step_for_profiling(self) -> None:
         if (
@@ -620,7 +617,7 @@ class Tau0VLATrainer(Trainer):
         self._python_gc_disabled_by_trainer = True
         logger.info(
             "Python automatic GC disabled in the main training process; manual gc.collect() "
-            "and torch.cuda.empty_cache() will run every %s global steps.",
+            "and accelerator cache flush will run every %s global steps.",
             getattr(self.args, "torch_empty_cache_steps", None),
         )
 
@@ -650,15 +647,14 @@ class Tau0VLATrainer(Trainer):
             return
 
         collected = gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        empty_cache()
         self._manual_memory_cleanup_last_step = step
         logger.info(
             "Manual memory cleanup at global_step=%s: gc.collect() reclaimed %s objects; "
-            "torch.cuda.empty_cache() called=%s.",
+            "accelerator empty_cache() called=%s.",
             step,
             collected,
-            torch.cuda.is_available(),
+            is_available("xpu") or is_available("cuda"),
         )
 
     def _update_loss_tracker_from_outputs(self, outputs: Union[Dict, Any]):
@@ -1318,7 +1314,7 @@ class ProfilingDataLoaderProxy:
 def safe_save_model_for_hf_trainer(trainer: Trainer, output_dir: str):
     """Model-saving helper that understands DeepSpeed."""
     if trainer.deepspeed:
-        torch.cuda.synchronize()
+        synchronize()
         trainer.save_model(output_dir)
         return
 

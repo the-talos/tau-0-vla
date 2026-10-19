@@ -39,6 +39,7 @@ repo_root = project_root.parent
 sys.path.append(str(project_root))
 sys.path.append(str(repo_root))
 
+from tau0_vla.utils.device import device_count
 from tau0_vla.utils.logging import setup_py_logging
 
 
@@ -310,7 +311,7 @@ def train():
         notes = "Launched via CLI"
 
     # --- Detect the GPU count and append it to run_name ---
-    world_size = int(os.environ.get("WORLD_SIZE", torch.cuda.device_count() or 1))
+    world_size = int(os.environ.get("WORLD_SIZE", device_count() or 1))
     num_nodes = int(os.environ.get("NNODES", os.environ.get("SLURM_NNODES", 1)))
     gpus_per_node = world_size // max(num_nodes, 1)
     if num_nodes > 1:

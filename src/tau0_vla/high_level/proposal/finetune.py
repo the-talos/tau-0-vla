@@ -7,6 +7,8 @@ import torch
 from peft import LoraConfig, get_peft_model
 from transformers import set_seed
 
+from tau0_vla.utils.device import resolve_device
+
 from .data import load_images, read_samples, sha256
 from .format import answer_text, messages
 from .runtime import encode, load_model
@@ -31,7 +33,8 @@ def training_batch(row, processor, max_length):
     return full
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
+    """CLI surface, split out so tests can pin flags without running the model."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument("--adapter", help="Continue training a previously saved proposal adapter")
@@ -42,7 +45,16 @@ def main():
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--max-length", type=int, default=8192)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="xpu | cuda | cpu, with an optional index (xpu:1). Auto-detects XPU > CUDA > CPU when omitted.",
+    )
+    return parser
+
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
     if args.steps <= 0 or args.rank <= 0 or args.learning_rate <= 0:
         raise ValueError("steps, rank and learning-rate must be positive")
@@ -50,7 +62,8 @@ def main():
         raise FileExistsError(args.output)
     samples = read_samples(args.input, require_answers=True)
     set_seed(args.seed)
-    model, processor = load_model(args.model, args.adapter, device=args.device, attention="sdpa",
+    device = resolve_device(args.device)
+    model, processor = load_model(args.model, args.adapter, device=device, attention="sdpa",
                                   adapter_trainable=True)
     if not args.adapter:
         model = get_peft_model(model, LoraConfig(
@@ -66,7 +79,7 @@ def main():
     losses = []
     for step in range(args.steps):
         sample = samples[step % len(samples)]
-        inputs = training_batch(sample, processor, args.max_length).to(args.device)
+        inputs = training_batch(sample, processor, args.max_length).to(device)
         loss = model(**inputs).loss
         if not torch.isfinite(loss):
             raise ValueError(f"Non-finite loss at step {step}")

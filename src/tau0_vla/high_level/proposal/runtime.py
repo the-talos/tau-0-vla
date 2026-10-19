@@ -5,11 +5,13 @@ from pathlib import Path
 import torch
 from transformers import AutoProcessor, Qwen3_5ForConditionalGeneration
 
+from tau0_vla.utils.device import resolve_device
+
 from .data import load_images, sha256
 from .format import FORMAT_TAGS, decode, messages, parse_output, update_memory
 
 
-def load_model(model_path, adapter=None, device="cuda:0", attention="eager", adapter_trainable=False):
+def load_model(model_path, adapter=None, device=None, attention="eager", adapter_trainable=False):
     model_path = str(Path(model_path).resolve())
     if adapter:
         config = json.loads((Path(adapter) / "adapter_config.json").read_text())
@@ -39,7 +41,7 @@ def load_model(model_path, adapter=None, device="cuda:0", attention="eager", ada
         model = PeftModel.from_pretrained(model, adapter, is_trainable=adapter_trainable)
     for key in ("temperature", "top_p", "top_k"):
         setattr(model.generation_config, key, None)
-    return model.to(device), processor
+    return model.to(resolve_device(device)), processor
 
 
 def encode(processor, prompt, generation=True):
@@ -50,7 +52,7 @@ def encode(processor, prompt, generation=True):
 
 
 class Proposal:
-    def __init__(self, model_path, adapter=None, device="cuda:0", max_new_tokens=512, attention="eager"):
+    def __init__(self, model_path, adapter=None, device=None, max_new_tokens=512, attention="eager"):
         self.model, self.processor = load_model(model_path, adapter, device, attention)
         self.model.eval()
         self.max_new_tokens = max_new_tokens

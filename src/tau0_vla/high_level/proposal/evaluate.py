@@ -39,15 +39,25 @@ def metrics(records):
     return result
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
+    """CLI surface, split out so tests can pin flags without running the model."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument("--adapter")
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="xpu | cuda | cpu, with an optional index (xpu:1). Auto-detects XPU > CUDA > CPU when omitted.",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--resume", action="store_true")
+    return parser
+
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
     samples = read_samples(args.input, require_answers=True)
     if args.output.exists() and not args.resume:

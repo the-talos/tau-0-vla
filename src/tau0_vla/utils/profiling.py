@@ -12,11 +12,16 @@ from typing import Dict, Optional
 
 import torch
 
+from tau0_vla.utils.device import synchronize
+
 
 def cuda_sync() -> None:
-    """Synchronize the current stream when CUDA is available; a no-op otherwise."""
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
+    """Synchronize the accelerator stream; a no-op without one.
+
+    Kept under its historical name because ``tau0_vla`` callers and the deploy
+    scripts import it; it dispatches to XPU, CUDA or CPU.
+    """
+    synchronize()
 
 
 def sync_ts(enabled: bool) -> float:
