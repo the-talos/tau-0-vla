@@ -79,7 +79,7 @@ def resolve_device(device: DeviceLike) -> torch.device:
     """Resolve ``None`` / str / :class:`torch.device` to a concrete device.
 
     ``None`` auto-detects with :func:`default_device`. Explicit values are
-    honoured verbatim — an unsupported device still fails loudly at the first
+    honoured verbatim, so an unsupported device still fails loudly at the first
     kernel instead of being silently replaced by a different backend.
     """
     if isinstance(device, torch.device):
